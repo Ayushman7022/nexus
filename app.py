@@ -3,7 +3,6 @@ import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
 # Load the saved model and encoders
 model = joblib.load("random_forest_model.pkl")
@@ -37,10 +36,9 @@ class InputData(BaseModel):
     BloodSugar: float
     WaistCircumference: float
 
-# Home route
-@app.get("/")
-def home():
-    return {"message": "Hello, Railway!"}
+
+
+
 
 # Define API endpoint
 @app.post("/predict")
@@ -50,7 +48,7 @@ def predict(data: InputData):
     # Encode categorical columns
     categorical_cols = ["PhysicalActivity", "StressLevel", "BloodPressure", "Cholesterol"]
     for col in categorical_cols:
-        input_df[col] = label_encoders[col].transform([input_df[col].values[0]])  # Fix `.iloc[0]`
+        input_df[col] = label_encoders[col].transform([input_df[col].iloc[0]])
 
     # Make predictions
     predictions = model.predict(input_df)
@@ -64,7 +62,3 @@ def predict(data: InputData):
     }
 
     return output
-
-# Ensure this runs only when executed directly
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)
