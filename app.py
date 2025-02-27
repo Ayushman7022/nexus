@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = "AIzaSyCVURliB0WKQBge9h8VKu4sA2CIRb9D1hU"
 
 # Load the trained model and encoders
 model = joblib.load("random_forest_model.pkl")
