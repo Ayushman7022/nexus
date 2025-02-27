@@ -1,40 +1,50 @@
 import joblib
 import pandas as pd
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, conint, confloat
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
 
-# Load the saved model and encoders
+# Load environment variables
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Load the trained model and encoders
 model = joblib.load("random_forest_model.pkl")
 label_encoders = joblib.load("label_encoders.pkl")
 
 # Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS for frontend requests (Android app)
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production
+    allow_origins=["*"],  # Adjust for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Define request data model with additional validation
+# Initialize LangChain with Gemini API
+llm = ChatGoogleGenerativeAI(model="gemini-2.0", google_api_key=GOOGLE_API_KEY)
+
+# Define request data model
 class InputData(BaseModel):
-    Age: conint(ge=0, le=120)  # Age between 0 and 120
-    BMI: confloat(ge=10, le=50)  # BMI between 10 and 50
-    Smoking: conint(ge=0, le=1)  # 0 or 1
-    AlcoholConsumption: conint(ge=0, le=1)  # 0 or 1
-    PhysicalActivity: conint(ge=0, le=3)  # Example: 0 to 3 levels
-    DietType: conint(ge=0, le=2)  # Example: 0 to 2 types
-    SleepHours: conint(ge=0, le=24)  # Sleep hours between 0 and 24
-    StressLevel: conint(ge=0, le=10)  # Stress level between 0 and 10
-    BloodPressure: conint(ge=0, le=2)  # Example: 0 to 2 levels
-    Cholesterol: conint(ge=0, le=2)  # Example: 0 to 2 levels
-    FamilyHistory: conint(ge=0, le=1)  # 0 or 1
-    BloodSugar: confloat(ge=0, le=500)  # Blood sugar between 0 and 500
-    WaistCircumference: confloat(ge=0, le=200)  # Waist circumference between 0 and 200 cm
+    Age: conint(ge=0, le=120)
+    BMI: confloat(ge=10, le=50)
+    Smoking: conint(ge=0, le=1)
+    AlcoholConsumption: conint(ge=0, le=1)
+    PhysicalActivity: conint(ge=0, le=3)
+    DietType: conint(ge=0, le=2)
+    SleepHours: conint(ge=0, le=24)
+    StressLevel: conint(ge=0, le=10)
+    BloodPressure: conint(ge=0, le=2)
+    Cholesterol: conint(ge=0, le=2)
+    FamilyHistory: conint(ge=0, le=1)
+    BloodSugar: confloat(ge=0, le=500)
+    WaistCircumference: confloat(ge=0, le=200)
 
 # Root endpoint
 @app.get("/")
@@ -63,18 +73,31 @@ def predict(data: InputData):
         predictions = model.predict(input_df)
 
         # Ensure predictions are in the expected format
-        if predictions.shape[1] != 4:  # Check for 4 output columns
+        if len(predictions[0]) != 4:
             raise ValueError("Model output format is incorrect")
 
-        # Format the output
-        output = {
-            "Hypertension": int(predictions[0][0]),
-            "HeartDisease": int(predictions[0][1]),
-            "Obesity": int(predictions[0][2]),
-            "Diabetes": int(predictions[0][3])
+        # Extract disease predictions
+        diseases = {
+            "Hypertension": bool(predictions[0][0]),
+            "HeartDisease": bool(predictions[0][1]),
+            "Obesity": bool(predictions[0][2]),
+            "Diabetes": bool(predictions[0][3]),
         }
 
-        return output
+        # Get precautionary measures for detected diseases
+        detected_diseases = [disease for disease, present in diseases.items() if present]
+        precautions = {}
+
+        for disease in detected_diseases:
+            query = f"What precautions should a person take to avoid {disease} in later stages of life?"
+            response = llm.invoke(query)
+            precautions[disease] = response.content if hasattr(response, "content") else str(response)
+
+        return {
+            "predictions": diseases,
+            "precautions": precautions,
+        }
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
