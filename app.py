@@ -28,7 +28,7 @@ app.add_middleware(
 )
 
 # Initialize LangChain with Gemini API
-llm = ChatGoogleGenerativeAI(model="gemini-2.0", google_api_key=GOOGLE_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY)
 
 # Define request data model
 class InputData(BaseModel):
